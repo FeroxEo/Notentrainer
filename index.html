@@ -1,0 +1,1155 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Notentrainer">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#0E6F7E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="icon-192.png">
+<title>Notentrainer</title>
+<style>
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; }
+[hidden] { display: none !important; }
+</style>
+<style>
+/* Layout: eine Spalte mit vier Ansichten (Auswahl, Training, Ergebnis, Einstellungen). */
+:root {
+  --bg: #F1F4F8;
+  --surface: #FFFFFF;
+  --ink: #16202C;
+  --muted: #5A6776;
+  --staff: #2B3745;
+  --edge: #D5DCE5;
+  --key: #E4E9F0;
+  --key-press: #CFD7E2;
+  --accent: #0E6F7E;
+  --accent-soft: rgba(14, 111, 126, .13);
+  --on-accent: #FFFFFF;
+  --good: #1B8A4B;
+  --bad: #C7322A;
+  --font-ui: ui-rounded, "SF Pro Rounded", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0D131A; --surface: #17202A; --ink: #E8EDF3; --muted: #93A0AF;
+    --staff: #C9D3DF; --edge: #2A3644; --key: #223040; --key-press: #2D4055;
+    --accent: #4FC3D4; --accent-soft: rgba(79, 195, 212, .16); --on-accent: #06242A; --good: #4CC38A; --bad: #FF7A70;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0D131A; --surface: #17202A; --ink: #E8EDF3; --muted: #93A0AF;
+  --staff: #C9D3DF; --edge: #2A3644; --key: #223040; --key-press: #2D4055;
+  --accent: #4FC3D4; --accent-soft: rgba(79, 195, 212, .16); --on-accent: #06242A; --good: #4CC38A; --bad: #FF7A70;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  padding-block: 12px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+button, select { font: inherit; color: inherit; }
+button:focus-visible, select:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+
+.app { max-width: 520px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+.view { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+
+header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+h1 { margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: .01em; text-wrap: balance; }
+h2 { margin: 0; font-size: 1rem; }
+.ghost {
+  border: 1px solid var(--edge); background: var(--surface); border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; font-weight: 600; font-size: .9rem;
+}
+
+.label { font-size: .75rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.group { display: flex; flex-direction: column; gap: 8px; }
+
+.seg { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; padding: 4px; background: var(--key); border-radius: 12px; }
+.seg button {
+  border: 0; background: transparent; border-radius: 9px; padding: 12px 4px; cursor: pointer;
+  font-weight: 600; font-size: .95rem; color: var(--muted); min-width: 0;
+}
+.seg button[aria-pressed="true"] { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.18); }
+.seg.big button { padding: 16px 4px; font-size: 1.05rem; }
+
+.primary { border: 0; background: var(--accent); color: var(--on-accent); border-radius: 14px; padding: 18px; font-weight: 700; font-size: 1.1rem; cursor: pointer; }
+.secondary { border: 1px solid var(--edge); background: var(--surface); border-radius: 14px; padding: 16px; font-weight: 600; font-size: 1rem; cursor: pointer; }
+
+.card { background: var(--surface); border: 1px solid var(--edge); border-radius: 16px; padding: 14px; }
+.hint { margin: 0; font-size: .85rem; color: var(--muted); line-height: 1.45; }
+.range-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.range-line strong { font-variant-numeric: tabular-nums; }
+.link { border: 0; background: none; color: var(--accent); font-weight: 700; cursor: pointer; padding: 6px 0; }
+
+/* Training */
+.progress { height: 8px; background: var(--key); border-radius: 99px; overflow: hidden; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.pmeta { display: flex; justify-content: space-between; font-size: .85rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stats { display: flex; gap: 8px; }
+.stat { flex: 1; min-width: 0; background: var(--surface); border: 1px solid var(--edge); border-radius: 12px; padding: 8px 12px; }
+.stat b { display: block; font-size: 1.3rem; font-variant-numeric: tabular-nums; line-height: 1.2; }
+.stat span { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+
+.staffcard { background: var(--surface); border: 1px solid var(--edge); border-radius: 16px; padding: 6px 8px 12px; }
+.staffcard svg { display: block; width: 100%; height: auto; }
+#feedback { min-height: 1.6em; text-align: center; font-weight: 700; color: var(--muted); }
+#feedback.ok { color: var(--good); }
+#feedback.bad { color: var(--bad); }
+
+.staff-line { stroke: var(--staff); stroke-width: 1.5; }
+.ledger { stroke: var(--staff); stroke-width: 2; stroke-linecap: round; }
+.clef { fill: none; stroke: var(--staff); stroke-width: 3.1; stroke-linecap: round; stroke-linejoin: round; }
+.clef-fill { fill: var(--staff); stroke: none; }
+.note-head { fill: var(--staff); }
+.note-stem { stroke: var(--staff); stroke-width: 2.2; stroke-linecap: round; }
+#note.ok .note-head { fill: var(--good); }
+#note.ok .note-stem { stroke: var(--good); }
+#note.bad { animation: shake .3s; }
+@keyframes shake { 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+
+.keys { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: auto; }
+.key {
+  border: 0; background: var(--key); border-radius: 14px; min-height: 72px; cursor: pointer;
+  font-size: 1.9rem; font-weight: 700; min-width: 0;
+}
+.key:active { background: var(--key-press); }
+.key.wrong { background: var(--bad); color: #fff; opacity: .9; }
+.key.right { background: var(--good); color: #fff; }
+.key:disabled { cursor: default; }
+.key.skip { font-size: .95rem; font-weight: 600; color: var(--muted); background: transparent; border: 1px dashed var(--edge); }
+
+/* Ergebnis */
+.score { text-align: center; padding: 22px 14px; }
+.score big { display: block; font-size: 3.4rem; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.score p { margin: 6px 0 0; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.chip { border: 1px solid var(--edge); background: var(--bg); border-radius: 999px; padding: 7px 12px; font-size: .85rem; font-weight: 600; cursor: pointer; }
+.chip.static { cursor: default; font-variant-numeric: tabular-nums; }
+.danger { color: var(--bad); }
+
+/* Einstellungen: Tonumfang-Grafik */
+.rangesvg { display: block; width: 100%; height: auto; cursor: pointer; touch-action: manipulation; }
+.band { fill: var(--accent-soft); }
+.ring { fill: none; stroke: var(--accent); stroke-width: 2.4; }
+.cap { font-size: 11px; font-weight: 700; fill: var(--muted); text-anchor: middle; font-family: var(--font-ui); letter-spacing: .04em; }
+.cap.on { fill: var(--accent); }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.row label { display: flex; flex-direction: column; gap: 4px; font-size: .8rem; color: var(--muted); min-width: 0; }
+select { width: 100%; padding: 10px; border-radius: 10px; border: 1px solid var(--edge); background: var(--bg); font-size: 1rem; color: var(--ink); }
+details summary { cursor: pointer; font-weight: 600; font-size: .9rem; color: var(--accent); padding: 4px 0; }
+details[open] summary { margin-bottom: 10px; }
+.presets { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.acc { fill: none; stroke: var(--staff); stroke-linecap: round; }
+#note.ok .acc { stroke: var(--good); }
+.keys.five { grid-template-columns: repeat(5, 1fr); gap: 8px; }
+.keys.five .key { font-size: 1.6rem; min-height: 68px; }
+.keys.five .key.skip { font-size: .8rem; }
+.key.accKey { font-size: 1.9rem; }
+.key.accKey[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+
+/* Bär */
+.bearwrap { display: flex; justify-content: center; }
+.bear { width: min(230px, 62vw); height: auto; overflow: visible; }
+.bear .fig { transform-box: fill-box; transform-origin: 50% 100%; }
+.bear.party .fig { animation: hop .55s ease-in-out infinite; }
+.bear.cheer .fig { animation: hop .8s ease-in-out infinite; }
+.bear.happy .fig { animation: sway 1.6s ease-in-out infinite; }
+.bear.worried .fig { animation: tremble .25s linear infinite; }
+.bear.cry .fig { animation: sob 1s ease-in-out infinite; }
+@keyframes hop { 0%,100% { transform: translateY(0) scale(1,1); } 50% { transform: translateY(-14px) scale(.98,1.03); } }
+@keyframes sway { 0%,100% { transform: rotate(-3deg); } 50% { transform: rotate(3deg); } }
+@keyframes tremble { 0% { transform: translateX(-1.5px); } 50% { transform: translateX(1.5px); } 100% { transform: translateX(-1.5px); } }
+@keyframes sob { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.02,.96); } }
+.bear .conf { transform-box: fill-box; transform-origin: center; animation: fall 2.4s linear infinite; }
+@keyframes fall { 0% { transform: translateY(-30px) rotate(0); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(190px) rotate(360deg); opacity: .9; } }
+.bear .tear { animation: drip 1s ease-in infinite; }
+@keyframes drip { 0% { transform: translateY(0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translateY(46px); opacity: 0; } }
+.bear .puddle { transform-box: fill-box; transform-origin: center; animation: puddle 3s ease-in-out infinite alternate; }
+@keyframes puddle { from { transform: scaleX(.7); } to { transform: scaleX(1.1); } }
+.bear .twinkle { transform-box: fill-box; transform-origin: center; animation: twinkle 1s ease-in-out infinite; }
+@keyframes twinkle { 0%,100% { transform: scale(.6); opacity: .5; } 50% { transform: scale(1.1); opacity: 1; } }
+.bear .drop { animation: drip 1.4s ease-in infinite; }
+.verdict { text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.verdict h2 { font-size: 1.35rem; text-wrap: balance; }
+.verdict p { margin: 0; color: var(--muted); text-wrap: balance; }
+.facts { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 12px; text-align: left; }
+.facts div { background: var(--bg); border-radius: 10px; padding: 8px 12px; }
+.facts b { display: block; font-variant-numeric: tabular-nums; font-size: 1.1rem; }
+.facts span { font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 10px; }
+.badge { background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 5px 12px; font-size: .82rem; font-weight: 700; }
+
+/* Statistik */
+.chart { display: block; width: 100%; height: auto; }
+.chart .gl { stroke: var(--edge); stroke-width: 1; }
+.chart .tick { fill: var(--muted); font-size: 10px; font-family: var(--font-ui); font-variant-numeric: tabular-nums; }
+.chart .line { fill: none; stroke: var(--accent); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.chart .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.chart .dot.sel { stroke: var(--ink); }
+.chart .endlab { fill: var(--ink); font-size: 11px; font-weight: 700; font-family: var(--font-ui); text-anchor: middle; }
+.chart .hit { fill: transparent; cursor: pointer; }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+table.runs { width: 100%; border-collapse: collapse; font-size: .88rem; font-variant-numeric: tabular-nums; }
+table.runs th { text-align: left; font-size: .7rem; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; padding: 4px 4px 6px; }
+table.runs td { padding: 7px 4px; border-top: 1px solid var(--edge); }
+table.runs .r { text-align: right; }
+.empty { text-align: center; color: var(--muted); padding: 18px 8px; }
+
+@media (prefers-reduced-motion: reduce) {
+  #note.bad { animation: none; } .progress i { transition: none; }
+  .bear *, .bear { animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+
+
+
+<div class="app">
+
+  <!-- 1. Auswahl -->
+  <section class="view" id="viewStart">
+    <header>
+      <h1>Notentrainer</h1>
+      <div style="display:flex;gap:8px">
+        <button class="ghost" id="btnStats" type="button">Statistik</button>
+        <button class="ghost" id="btnSettings" type="button">Einstellungen</button>
+      </div>
+    </header>
+
+    <div class="group">
+      <span class="label">Notenschlüssel</span>
+      <div class="seg big" id="clefSeg" role="group" aria-label="Notenschlüssel">
+        <button type="button" data-clef="treble" aria-pressed="true">Violinschlüssel</button>
+        <button type="button" data-clef="bass" aria-pressed="false">Bassschlüssel</button>
+      </div>
+    </div>
+
+    <div class="group">
+      <span class="label">Länge der Einheit</span>
+      <div class="seg big" id="lenSeg" role="group" aria-label="Anzahl Fragen">
+        <button type="button" data-len="20" aria-pressed="true">20 Fragen</button>
+        <button type="button" data-len="40" aria-pressed="false">40 Fragen</button>
+        <button type="button" data-len="60" aria-pressed="false">60 Fragen</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="range-line">
+        <span>Tonumfang: <strong id="rangeText">C4 bis A5</strong></span>
+        <button class="link" type="button" id="btnEditRange">Ändern</button>
+      </div>
+      <div class="range-line" style="margin-top:4px">
+        <span>Vorzeichen: <strong id="accText">ohne</strong></span>
+      </div>
+    </div>
+
+    <p class="hint" id="lastText"></p>
+
+    <button class="primary" type="button" id="btnStart" style="margin-top:auto">Einheit starten</button>
+  </section>
+
+  <!-- 2. Training -->
+  <section class="view" id="viewTrainer" hidden>
+    <header>
+      <h1 id="trainTitle">Violinschlüssel</h1>
+      <button class="ghost" id="btnQuit" type="button">Beenden</button>
+    </header>
+
+    <div class="group" style="gap:6px">
+      <div class="pmeta"><span id="pText">Frage 1 von 20</span><span><span id="pTime">0:00</span> · <span id="pPct">0 %</span></span></div>
+      <div class="progress" aria-hidden="true"><i id="pBar"></i></div>
+    </div>
+
+    <div class="stats" aria-label="Ergebnis">
+      <div class="stat"><b id="sRight">0</b><span>Richtig</span></div>
+      <div class="stat"><b id="sWrong">0</b><span>Fehler</span></div>
+      <div class="stat"><b id="sStreak">0</b><span>Serie</span></div>
+    </div>
+
+    <section class="staffcard">
+      <svg id="staff" viewBox="0 14 300 196" role="img" aria-label="Notenzeile mit Notenschlüssel und einer Note"></svg>
+      <div id="feedback" aria-live="polite">Welche Note ist das?</div>
+    </section>
+
+    <div class="keys" id="keys"></div>
+  </section>
+
+  <!-- 3. Ergebnis -->
+  <section class="view" id="viewResult" hidden>
+    <div class="bearwrap" id="bearBox"></div>
+    <div class="verdict">
+      <h2 id="rTitle">Geschafft!</h2>
+      <p id="rSub"></p>
+    </div>
+    <div class="card score">
+      <big id="rScore">18 / 20</big>
+      <p id="rText">beim ersten Versuch richtig</p>
+      <div class="facts">
+        <div><b id="rTime">0:00</b><span>Zeit</span></div>
+        <div><b id="rPace">0 s</b><span>Pro Note</span></div>
+      </div>
+      <div class="badges" id="rBadges"></div>
+      <div id="rMissed"></div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;margin-top:auto">
+      <button class="primary" type="button" id="btnAgain">Nochmal</button>
+      <button class="secondary" type="button" id="btnHome">Zur Auswahl</button>
+    </div>
+  </section>
+
+  <!-- 4. Einstellungen -->
+  <section class="view" id="viewSettings" hidden>
+    <header><h1>Einstellungen</h1></header>
+
+    <div class="card group" style="gap:12px">
+      <h2>Tonumfang festlegen</h2>
+      <div class="seg" id="edClefSeg" role="group" aria-label="Schlüssel für den Tonumfang">
+        <button type="button" data-clef="treble" aria-pressed="true">Violinschlüssel</button>
+        <button type="button" data-clef="bass" aria-pressed="false">Bassschlüssel</button>
+      </div>
+      <div class="seg" id="edWhichSeg" role="group" aria-label="Welche Grenze setzen">
+        <button type="button" data-which="0" aria-pressed="true" id="whichLow">Tiefste: C4</button>
+        <button type="button" data-which="1" aria-pressed="false" id="whichHigh">Höchste: A5</button>
+      </div>
+      <svg id="rangeSvg" class="rangesvg" viewBox="0 14 300 196" role="img" aria-label="Notenzeile zum Festlegen des Tonumfangs. Tippe auf die gewünschte Position."></svg>
+      <p class="hint">Wähle oben „Tiefste“ oder „Höchste“ und tippe dann in der Notenzeile auf die Stelle der Note. Der getönte Bereich wird geübt.</p>
+      <div class="presets" id="presets">
+        <button type="button" class="chip" data-preset="lines">Nur Linien und Zwischenräume</button>
+        <button type="button" class="chip" data-preset="default">Standard</button>
+        <button type="button" class="chip" data-preset="full">Voller Umfang</button>
+      </div>
+      <details>
+        <summary>Mit Notennamen einstellen</summary>
+        <div class="row">
+          <label for="selLow">Tiefste Note<select id="selLow"></select></label>
+          <label for="selHigh">Höchste Note<select id="selHigh"></select></label>
+        </div>
+      </details>
+    </div>
+
+    <div class="card group" style="gap:12px">
+      <h2>Vorzeichen</h2>
+      <div class="seg" id="accSeg" role="group" aria-label="Vorzeichen üben">
+        <button type="button" data-acc="off" aria-pressed="true">Ohne</button>
+        <button type="button" data-acc="mixed" aria-pressed="false">Gemischt</button>
+        <button type="button" data-acc="only" aria-pressed="false">Nur ♯ ♭</button>
+      </div>
+      <p class="hint">Bei Vorzeichen tippst du erst ♯ oder ♭ und dann den Buchstaben. „Gemischt“ enthält Noten mit und ohne Vorzeichen, „Nur ♯ ♭“ ausschließlich Noten mit Vorzeichen. Im Deutschen heißen sie z. B. Fis, Ges oder B (für H♭).</p>
+    </div>
+
+    <div class="card group" style="gap:12px">
+      <h2>Notennamen</h2>
+      <div class="seg" id="nameSeg" role="group" aria-label="Notennamen">
+        <button type="button" data-names="de" aria-pressed="true">C D E F G A H</button>
+        <button type="button" data-names="en" aria-pressed="false">C D E F G A B</button>
+      </div>
+      <p class="hint">Im Deutschen heißt die Note unter C „H“, im Englischen „B“.</p>
+    </div>
+
+    <button type="button" class="primary" id="btnBack" style="margin-top:auto">Fertig</button>
+  </section>
+
+  <!-- 5. Statistik -->
+  <section class="view" id="viewStats" hidden>
+    <header>
+      <h1>Statistik</h1>
+      <button class="ghost" id="btnStatsBack" type="button">Zurück</button>
+    </header>
+    <div class="seg" id="stClefSeg" role="group" aria-label="Notenschlüssel">
+      <button type="button" data-clef="treble" aria-pressed="true">Violinschlüssel</button>
+      <button type="button" data-clef="bass" aria-pressed="false">Bassschlüssel</button>
+    </div>
+    <div class="seg" id="stAccSeg" role="group" aria-label="Vorzeichen">
+      <button type="button" data-acc="off" aria-pressed="true">Ohne ♯ ♭</button>
+      <button type="button" data-acc="mixed" aria-pressed="false">Gemischt</button>
+      <button type="button" data-acc="only" aria-pressed="false">Nur ♯ ♭</button>
+    </div>
+    <div id="statsBody" style="display:flex;flex-direction:column;gap:14px">
+      <div class="summary">
+        <div class="stat"><b id="stN">0</b><span>Einheiten</span></div>
+        <div class="stat"><b id="stBest">–</b><span>Beste Quote</span></div>
+        <div class="stat"><b id="stFast">–</b><span>Schnellste Note</span></div>
+      </div>
+      <p class="hint" id="stTrend"></p>
+      <div class="card group">
+        <h2>Trefferquote pro Einheit</h2>
+        <svg class="chart" id="chartQuota" viewBox="0 0 300 150" role="img" aria-label="Verlauf der Trefferquote"></svg>
+      </div>
+      <div class="card group">
+        <h2>Sekunden pro Note</h2>
+        <svg class="chart" id="chartTime" viewBox="0 0 300 150" role="img" aria-label="Verlauf der Zeit pro Note"></svg>
+      </div>
+      <p class="hint" id="stInfo" aria-live="polite">Tippe auf einen Punkt für Details.</p>
+      <div class="card group">
+        <h2>Letzte Einheiten</h2>
+        <div style="overflow-x:auto">
+          <table class="runs">
+            <thead><tr><th>Datum</th><th>Fragen</th><th class="r">Richtig</th><th class="r">Zeit</th></tr></thead>
+            <tbody id="stRows"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+    <p class="empty" id="stEmpty" hidden>Noch keine Einheit mit dieser Auswahl. Nach der ersten Einheit erscheint hier dein Verlauf.</p>
+    <button type="button" class="chip danger" id="btnClearHist" style="align-self:flex-start">Verlauf löschen</button>
+  </section>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ---- Notenmodell -------------------------------------------------------
+  // Jede Note ist eine Zahl: Oktave*7 + Stufe (C=0 D=1 E=2 F=3 G=4 A=5 H=6).
+  // So ist C4 (eingestrichenes C) = 28.
+  var STEP_DE = ["C", "D", "E", "F", "G", "A", "H"];
+  var STEP_EN = ["C", "D", "E", "F", "G", "A", "B"];
+  var BASE = { treble: 30, bass: 18 };                 // untere Notenlinie: E4 bzw. G2
+  // Violinschlüssel: E3 bis E6. Bassschlüssel: tiefstes E des E-Basses in der
+  // üblichen Notation (E2, klingt eine Oktave tiefer) bis zum mittleren C (C4).
+  var LIMITS = { treble: [23, 44], bass: [16, 28] };
+  var PRESETS = {
+    treble: { lines: [30, 38], default: [28, 37], full: [23, 44] },
+    bass:   { lines: [18, 26], default: [18, 28], full: [16, 28] }
+  };
+  var CLEF_NAME = { treble: "Violinschlüssel", bass: "Bassschlüssel" };
+  var VB_Y = 14, VB_H = 196;   // sichtbarer Ausschnitt der Notenzeilen-Grafiken
+
+  var defaults = {
+    clef: "treble", len: 20, names: "de", acc: "off", edClef: "treble",
+    range: { treble: [28, 37], bass: [16, 28] },
+    history: []
+  };
+  var KEY = "notentrainer.v1";
+  var state = load();
+
+  function load() {
+    var s = JSON.parse(JSON.stringify(defaults));
+    try {
+      var raw = localStorage.getItem(KEY);
+      if (raw) {
+        var p = JSON.parse(raw);
+        if (p.clef === "treble" || p.clef === "bass") s.clef = p.clef;
+        else if (p.mode === "treble" || p.mode === "bass") s.clef = p.mode;
+        if (p.len === 20 || p.len === 40 || p.len === 60) s.len = p.len;
+        if (p.names === "en" || p.names === "de") s.names = p.names;
+        if (p.acc === "off" || p.acc === "mixed" || p.acc === "only") s.acc = p.acc;
+        if (Array.isArray(p.history)) s.history = p.history.filter(function (h) {
+          return h && (h.clef === "treble" || h.clef === "bass") && h.total > 0 && h.ms > 0;
+        }).slice(-300);
+        if (p.range) ["treble", "bass"].forEach(function (c) {
+          var r = p.range[c];
+          if (r && r[0] <= r[1]) {
+            var lo = Math.max(LIMITS[c][0], r[0]), hi = Math.min(LIMITS[c][1], r[1]);
+            if (lo <= hi) s.range[c] = [lo, hi];
+          }
+        });
+      }
+    } catch (e) {}
+    s.edClef = s.clef;
+    return s;
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+
+  function letters() { return state.names === "en" ? STEP_EN : STEP_DE; }
+  function stepOf(n) { return ((n % 7) + 7) % 7; }
+  function label(n) { return letters()[stepOf(n)] + Math.floor(n / 7); }
+  function $(id) { return document.getElementById(id); }
+
+  // ---- Zeichnen ------------------------------------------------------------
+  var NS = "http://www.w3.org/2000/svg";
+  var S = 14;                 // Abstand zweier Notenlinien
+  var BOTTOM = 128;           // y der untersten Linie
+  var NOTE_X = 190;
+
+  function yOf(p) { return BOTTOM - p * (S / 2); }
+
+  // Glatte Kurve durch Punkte (Catmull-Rom), Koordinaten in Linienabständen
+  function smooth(pts, ox, oy) {
+    var P = pts.map(function (q) { return [ox + q[0] * S, oy + q[1] * S]; });
+    var d = "M" + P[0][0].toFixed(1) + " " + P[0][1].toFixed(1);
+    for (var i = 0; i < P.length - 1; i++) {
+      var p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+      var c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+      var c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+      d += " C" + c1[0].toFixed(1) + " " + c1[1].toFixed(1) + " " + c2[0].toFixed(1) + " " + c2[1].toFixed(1) + " " + p2[0].toFixed(1) + " " + p2[1].toFixed(1);
+    }
+    return d;
+  }
+
+  var TREBLE_PTS = [
+    [-0.78, 2.7], [-0.5, 3.3], [0.2, 3.5], [0.62, 3.0], [0.55, 1.8], [0.42, 0],
+    [0.25, -2.0], [0.1, -3.9], [0.2, -4.85], [0.65, -5.0], [1.0, -4.3], [0.95, -3.2],
+    [0.55, -2.0], [-0.3, -1.0], [-1.05, -0.1], [-0.9, 0.9], [-0.1, 1.35], [0.85, 0.95],
+    [1.0, 0.0], [0.55, -0.85], [-0.15, -0.6], [-0.35, 0.15], [0.1, 0.5], [0.4, 0.15]
+  ];
+  var BASS_PTS = [
+    [-0.55, 0.1], [-0.3, -0.75], [0.6, -1.1], [1.5, -0.3], [1.45, 0.9], [0.7, 2.0], [-0.3, 3.0]
+  ];
+
+  function el(name, attrs, cls) {
+    var e = document.createElementNS(NS, name);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (cls) e.setAttribute("class", cls);
+    return e;
+  }
+  function clear(svg) { while (svg.firstChild) svg.removeChild(svg.firstChild); }
+
+  function drawStaffBase(svg, clef) {
+    clear(svg);
+    for (var i = 0; i < 5; i++) {
+      var y = BOTTOM - i * S;
+      svg.appendChild(el("line", { x1: 8, x2: 292, y1: y, y2: y }, "staff-line"));
+    }
+    if (clef === "treble") {
+      var gY = BOTTOM - S; // G-Linie
+      svg.appendChild(el("path", { d: smooth(TREBLE_PTS, 40, gY) }, "clef"));
+      svg.appendChild(el("circle", { cx: 40 - 0.78 * S, cy: gY + 2.7 * S, r: 3.2 }, "clef-fill"));
+    } else {
+      var fY = BOTTOM - 3 * S; // F-Linie
+      svg.appendChild(el("path", { d: smooth(BASS_PTS, 34, fY) }, "clef"));
+      svg.appendChild(el("circle", { cx: 34 - 0.15 * S, cy: fY - 0.05 * S, r: 0.5 * S }, "clef-fill"));
+      svg.appendChild(el("circle", { cx: 34 + 2.1 * S, cy: fY - 0.5 * S, r: 0.24 * S }, "clef-fill"));
+      svg.appendChild(el("circle", { cx: 34 + 2.1 * S, cy: fY + 0.5 * S, r: 0.24 * S }, "clef-fill"));
+    }
+  }
+
+  // Note samt Hilfslinien und Hals; p = Halbschritte über der untersten Linie
+  function accGlyph(x, y, acc) {
+    var g = el("g", { transform: "translate(" + x + " " + (y - (acc < 0 ? 2 : 0)) + ")" }, "acc");
+    if (acc > 0) {
+      g.appendChild(el("line", { x1: -3, y1: -12, x2: -3, y2: 15, "stroke-width": 1.8 }));
+      g.appendChild(el("line", { x1: 3.2, y1: -15, x2: 3.2, y2: 12, "stroke-width": 1.8 }));
+      g.appendChild(el("line", { x1: -7, y1: -2.2, x2: 7, y2: -5.2, "stroke-width": 3.4 }));
+      g.appendChild(el("line", { x1: -7, y1: 5.2, x2: 7, y2: 2.2, "stroke-width": 3.4 }));
+    } else {
+      g.appendChild(el("line", { x1: -4, y1: -19, x2: -4, y2: 8, "stroke-width": 2 }));
+      g.appendChild(el("path", { d: "M-4 1 C1 -6 8 -3 8 3 C8 8 2 10 -4 8", "stroke-width": 2.2 }));
+    }
+    return g;
+  }
+
+  function noteGroup(cx, p, id, acc) {
+    var cy = yOf(p);
+    var g = el("g", id ? { id: id } : {});
+    var q;
+    if (p < 0) for (q = -2; q >= p; q -= 2) g.appendChild(el("line", { x1: cx - 17, x2: cx + 17, y1: yOf(q), y2: yOf(q) }, "ledger"));
+    if (p > 8) for (q = 10; q <= p; q += 2) g.appendChild(el("line", { x1: cx - 17, x2: cx + 17, y1: yOf(q), y2: yOf(q) }, "ledger"));
+    var up = p < 4;
+    var sx = up ? cx + 8.6 : cx - 8.6;
+    g.appendChild(el("line", { x1: sx, x2: sx, y1: cy + (up ? -1 : 1), y2: cy + (up ? -46 : 46) }, "note-stem"));
+    g.appendChild(el("ellipse", { cx: cx, cy: cy, rx: 10, ry: 7, transform: "rotate(-20 " + cx + " " + cy + ")" }, "note-head"));
+    if (acc) g.appendChild(accGlyph(cx - 27, cy, acc));
+    return g;
+  }
+
+  var svg = $("staff");
+  function drawQuestion(clef, n, acc) {
+    drawStaffBase(svg, clef);
+    svg.appendChild(noteGroup(NOTE_X, n - BASE[clef], "note", acc));
+  }
+
+  // ---- Ansichten --------------------------------------------------------------
+  var VIEWS = ["viewStart", "viewTrainer", "viewResult", "viewSettings", "viewStats"];
+  function show(name) {
+    VIEWS.forEach(function (v) { $(v).hidden = v !== name; });
+    window.scrollTo(0, 0);
+  }
+
+  // ---- Auswahl ---------------------------------------------------------------
+  function setPressed(seg, attr, value) {
+    Array.prototype.forEach.call(seg.querySelectorAll("button"), function (b) {
+      b.setAttribute("aria-pressed", String(b.dataset[attr]) === String(value) ? "true" : "false");
+    });
+  }
+
+  function renderStart() {
+    setPressed($("clefSeg"), "clef", state.clef);
+    setPressed($("lenSeg"), "len", state.len);
+    var r = state.range[state.clef];
+    $("rangeText").textContent = label(r[0]) + " bis " + label(r[1]);
+    $("accText").textContent = { off: "ohne", mixed: "gemischt", only: "nur ♯ und ♭" }[state.acc];
+    var h = state.history, l = h[h.length - 1];
+    $("lastText").textContent = l ? "Letzte Einheit: " + l.right + " von " + l.total + " richtig in " + fmtTime(l.ms) + " (" + CLEF_NAME[l.clef] + ")" : "";
+  }
+
+  function fmtTime(ms) {
+    var s = Math.round(ms / 1000), m = Math.floor(s / 60), r = s % 60;
+    return m + ":" + (r < 10 ? "0" : "") + r;
+  }
+  function fmtSec(x) { return x.toFixed(1).replace(".", ",") + " s"; }
+
+  $("clefSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.clef = b.dataset.clef; state.edClef = state.clef; save(); renderStart();
+  });
+  $("lenSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.len = +b.dataset.len; save(); renderStart();
+  });
+
+  // ---- Training -----------------------------------------------------------------
+  var session = null;       // { clef, total, done, right, wrong, streak, missed }
+  var current = null;       // { n }
+  var locked = false;
+  var hadMistake = false;
+  var timer = null;
+  var tick = null;
+
+  function updateTime() {
+    if (!session) return;
+    $("pTime").textContent = fmtTime(session.ms || (Date.now() - session.t0));
+  }
+
+  var fb = $("feedback");
+  var keysEl = $("keys");
+
+  var pendAcc = 0;                       // gewähltes Vorzeichen: 1 = ♯, -1 = ♭
+  var SHARP_OK = [1, 1, 0, 1, 1, 1, 0];  // C D F G A können erhöht werden
+  var FLAT_OK = [0, 1, 1, 0, 1, 1, 1];   // D E G A H können erniedrigt werden
+  var SYM = { "1": "♯", "-1": "♭" };
+  var DE_SHARP = ["Cis", "Dis", "Eis", "Fis", "Gis", "Ais", "His"];
+  var DE_FLAT = ["Ces", "Des", "Es", "Fes", "Ges", "As", "B"];
+
+  function accName(step, acc) {
+    if (!acc) return letters()[step];
+    if (state.names === "de") return (acc > 0 ? DE_SHARP : DE_FLAT)[step] + " (" + letters()[step] + SYM[acc] + ")";
+    return letters()[step] + SYM[acc];
+  }
+  function labelAcc(n, acc) { return letters()[stepOf(n)] + (acc ? SYM[acc] : "") + Math.floor(n / 7); }
+
+  function setPend(v) {
+    pendAcc = v;
+    Array.prototype.forEach.call(keysEl.querySelectorAll(".accKey"), function (k) {
+      k.setAttribute("aria-pressed", +k.dataset.acc === v ? "true" : "false");
+    });
+  }
+
+  function buildKeys() {
+    keysEl.innerHTML = "";
+    var accOn = session.acc !== "off";
+    keysEl.className = "keys" + (accOn ? " five" : "");
+    letters().forEach(function (l, i) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "key"; b.textContent = l; b.dataset.step = i;
+      b.setAttribute("aria-label", "Note " + l);
+      keysEl.appendChild(b);
+    });
+    if (accOn) [["♯", 1, "Kreuz"], ["♭", -1, "B-Vorzeichen"]].forEach(function (a) {
+      var b = document.createElement("button");
+      b.type = "button"; b.className = "key accKey"; b.textContent = a[0]; b.dataset.acc = a[1];
+      b.setAttribute("aria-pressed", "false"); b.setAttribute("aria-label", a[2]);
+      keysEl.appendChild(b);
+    });
+    var s = document.createElement("button");
+    s.type = "button"; s.className = "key skip"; s.id = "btnSkip"; s.textContent = accOn ? "Lösung" : "Lösung zeigen";
+    keysEl.appendChild(s);
+    pendAcc = 0;
+  }
+
+  function startSession() {
+    clearTimeout(timer);
+    session = { clef: state.clef, total: state.len, acc: state.acc, done: 0, right: 0, wrong: 0, streak: 0, missed: {}, t0: Date.now(), ms: 0 };
+    current = null;
+    clearInterval(tick);
+    tick = setInterval(updateTime, 500);
+    updateTime();
+    $("trainTitle").textContent = CLEF_NAME[session.clef];
+    buildKeys(); renderProgress(); show("viewTrainer"); nextNote();
+  }
+
+  function renderProgress() {
+    var s = session;
+    $("sRight").textContent = s.right;
+    $("sWrong").textContent = s.wrong;
+    $("sStreak").textContent = s.streak;
+    $("pText").textContent = "Frage " + Math.min(s.done + 1, s.total) + " von " + s.total;
+    var pct = Math.round(s.done / s.total * 100);
+    $("pPct").textContent = pct + " %";
+    $("pBar").style.width = pct + "%";
+  }
+
+  function nextNote() {
+    clearTimeout(timer);
+    var r = state.range[session.clef], lo = r[0], hi = r[1], n, acc, tries = 0;
+    do {
+      n = lo + Math.floor(Math.random() * (hi - lo + 1));
+      acc = 0;
+      if (session.acc !== "off") {
+        var st = stepOf(n), opts = [];
+        if (SHARP_OK[st]) opts.push(1);
+        if (FLAT_OK[st]) opts.push(-1);
+        if (opts.length && (session.acc === "only" || Math.random() < 0.4)) acc = opts[Math.floor(Math.random() * opts.length)];
+      }
+      tries++;
+    } while (current && current.n === n && current.acc === acc && (hi > lo || acc) && tries < 30);
+    current = { n: n, acc: acc };
+    hadMistake = false; locked = false;
+    drawQuestion(session.clef, n, acc);
+    Array.prototype.forEach.call(keysEl.querySelectorAll(".key"), function (k) {
+      k.classList.remove("wrong", "right"); k.disabled = false;
+    });
+    setPend(0);
+    setFeedback(session.acc !== "off" ? "Welche Note? Erst ♯ oder ♭, dann der Buchstabe" : "Welche Note ist das?", "");
+  }
+
+  function setFeedback(text, cls) { fb.textContent = text; fb.className = cls || ""; }
+
+  function markMistake() {
+    if (hadMistake) return;
+    hadMistake = true;
+    session.wrong++; session.streak = 0;
+    var k = labelAcc(current.n, current.acc);
+    session.missed[k] = (session.missed[k] || 0) + 1;
+  }
+
+  function finishQuestion(delay) {
+    session.done++;
+    if (session.done >= session.total) {
+      session.ms = Date.now() - session.t0;   // Zeit endet mit der letzten Antwort
+      clearInterval(tick);
+      updateTime();
+    }
+    renderProgress();
+    timer = setTimeout(function () {
+      if (session.done >= session.total) showResult(); else nextNote();
+    }, delay);
+  }
+
+  function answer(step) {
+    if (locked || !current) return;
+    var btn = keysEl.querySelector('.key[data-step="' + step + '"]');
+    var accOn = session.acc !== "off";
+    var letterOk = step === stepOf(current.n);
+    var good = letterOk && pendAcc === current.acc;
+    setPend(0);
+    if (good) {
+      locked = true;
+      btn.classList.add("right");
+      $("note").classList.add("ok");
+      if (!hadMistake) { session.right++; session.streak++; }
+      setFeedback("Richtig: " + accName(step, current.acc), "ok");
+      finishQuestion(650);
+    } else {
+      btn.classList.add("wrong");
+      if (!accOn) btn.disabled = true;
+      else setTimeout(function () { btn.classList.remove("wrong"); }, 500);
+      var note = $("note");
+      note.classList.remove("bad"); void note.getBoundingClientRect(); note.classList.add("bad");
+      markMistake(); renderProgress();
+      setFeedback(accOn && letterOk ? "Richtiger Buchstabe, aber das Vorzeichen passt nicht" : "Nicht ganz, versuch es noch einmal", "bad");
+    }
+  }
+
+  function reveal() {
+    if (locked || !current) return;
+    locked = true;
+    var step = stepOf(current.n);
+    markMistake();
+    keysEl.querySelector('.key[data-step="' + step + '"]').classList.add("right");
+    if (current.acc) keysEl.querySelector('.accKey[data-acc="' + current.acc + '"]').classList.add("right");
+    setFeedback("Das ist ein " + accName(step, current.acc), "bad");
+    finishQuestion(1600);
+  }
+
+  keysEl.addEventListener("click", function (e) {
+    var b = e.target.closest("button");
+    if (!b) return;
+    if (b.id === "btnSkip") reveal();
+    else if (b.dataset.acc !== undefined) { if (!locked) setPend(pendAcc === +b.dataset.acc ? 0 : +b.dataset.acc); }
+    else if (b.dataset.step !== undefined) answer(+b.dataset.step);
+  });
+
+  document.addEventListener("keydown", function (e) {
+    if ($("viewTrainer").hidden) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (session && session.acc !== "off" && !locked) {
+      if (e.key === "#") { setPend(pendAcc === 1 ? 0 : 1); return; }
+      if (e.key === "-") { setPend(pendAcc === -1 ? 0 : -1); return; }
+    }
+    var idx = letters().indexOf(e.key.toUpperCase());
+    if (idx >= 0) answer(idx);
+  });
+
+  $("btnQuit").addEventListener("click", function () {
+    clearTimeout(timer); clearInterval(tick); session = null; renderStart(); show("viewStart");
+  });
+
+  // ---- Ergebnis -------------------------------------------------------------------
+  function showResult() {
+    var s = session;
+    var prev = state.history.filter(function (h) { return h.clef === s.clef && (h.acc || "off") === s.acc; });
+    var qNow = s.right / s.total, paceNow = s.ms / 1000 / s.total, badges = [];
+    if (prev.length) {
+      var lastRun = prev[prev.length - 1];
+      var bestQ = Math.max.apply(null, prev.map(function (h) { return h.right / h.total; }));
+      var bestP = Math.min.apply(null, prev.map(function (h) { return h.ms / h.total; }));
+      if (qNow > bestQ) badges.push("Neue Bestquote!");
+      else if (qNow > lastRun.right / lastRun.total) badges.push("Besser als beim letzten Mal");
+      if (s.ms / s.total < bestP) badges.push("Neue Bestzeit pro Note!");
+    } else {
+      badges.push("Erste Einheit im Kasten");
+    }
+    state.history.push({ d: Date.now(), clef: s.clef, total: s.total, right: s.right, ms: s.ms, acc: s.acc });
+    state.history = state.history.slice(-300);
+    save();
+    var mood = moodFor(qNow);
+    $("bearBox").innerHTML = bearSVG(mood.id);
+    $("rTitle").textContent = mood.title;
+    $("rSub").textContent = mood.sub;
+    $("rTime").textContent = fmtTime(s.ms);
+    $("rPace").textContent = fmtSec(paceNow);
+    var bb = $("rBadges"); bb.innerHTML = "";
+    badges.forEach(function (t) { var b = document.createElement("span"); b.className = "badge"; b.textContent = t; bb.appendChild(b); });
+    $("rScore").textContent = s.right + " / " + s.total;
+    var pct = Math.round(s.right / s.total * 100);
+    $("rText").textContent = "beim ersten Versuch richtig (" + pct + " %)";
+    var box = $("rMissed");
+    box.innerHTML = "";
+    var keys = Object.keys(s.missed).sort(function (a, b) { return s.missed[b] - s.missed[a]; });
+    if (keys.length) {
+      var h = document.createElement("p");
+      h.textContent = "Noch üben:";
+      box.appendChild(h);
+      var wrap = document.createElement("div");
+      wrap.className = "chips";
+      keys.slice(0, 8).forEach(function (k) {
+        var c = document.createElement("span");
+        c.className = "chip static";
+        c.textContent = k + (s.missed[k] > 1 ? " ×" + s.missed[k] : "");
+        wrap.appendChild(c);
+      });
+      box.appendChild(wrap);
+    } else {
+      var ok = document.createElement("p");
+      ok.textContent = "Keine einzige Note verfehlt.";
+      box.appendChild(ok);
+    }
+    show("viewResult");
+  }
+  // ---- Der Bär -----------------------------------------------------------------
+  function moodFor(q) {
+    var pc = Math.round(q * 100);
+    if (pc >= 100) return { id: "party", title: "PERFEKT!!!", sub: "Der Bär hat gerade eine Torte bestellt. Für dich. Und eine für sich selbst." };
+    if (pc >= 85) return { id: "cheer", title: "Der Bär tanzt auf dem Tisch!", sub: "Bitte keine Fragen. Er ist unfassbar stolz auf dich." };
+    if (pc >= 70) return { id: "happy", title: "Richtig stark!", sub: "Der Bär klatscht so laut, dass die Nachbarn klopfen." };
+    if (pc >= 50) return { id: "meh", title: "Na ja, geht noch.", sub: "Der Bär nickt höflich und isst heimlich einen Keks." };
+    if (pc >= 30) return { id: "worried", title: "Hm … der Bär schwitzt.", sub: "Noch eine Runde, und er kann nachts wieder ruhig schlafen." };
+    return { id: "cry", title: "Der Bär ist untröstlich!", sub: "Er weint in sein Kissen. Nur eine neue Einheit kann ihn retten." };
+  }
+
+  function star(x, y, s, d) {
+    return '<path class="twinkle" style="animation-delay:' + d + 's" transform="translate(' + x + ' ' + y + ') scale(' + s + ')" d="M0 -9 L2.5 -2.5 L9 0 L2.5 2.5 L0 9 L-2.5 2.5 L-9 0 L-2.5 -2.5Z" fill="#FFD84D"/>';
+  }
+  function confetti(n) {
+    var cols = ["#FF6B6B", "#FFD84D", "#4ECDC4", "#7C5CFF", "#5AA9FF", "#FF9F43"], h = "";
+    for (var i = 0; i < n; i++) {
+      var x = 10 + (i * 37) % 180;
+      h += '<rect class="conf" style="animation-delay:' + ((i * 0.37) % 2.4).toFixed(2) + 's;animation-duration:' + (2 + (i % 3) * 0.5) + 's" x="' + x + '" y="10" width="6" height="10" rx="1.5" fill="' + cols[i % cols.length] + '"/>';
+    }
+    return h;
+  }
+
+  function bearSVG(m) {
+    var B = "#8A5A3C", T = "#EBCFA6", D = "#2B1B12", PK = "#F28B82", W = "#7FB8F2";
+    var h = '<svg class="bear ' + m + '" viewBox="0 -14 200 222" role="img" aria-label="Cartoon-Bär, Stimmung: ' + m + '">';
+    h += m === "cry"
+      ? '<ellipse class="puddle" cx="100" cy="199" rx="78" ry="9" fill="' + W + '" opacity=".65"/>'
+      : '<ellipse cx="100" cy="199" rx="56" ry="7" fill="rgba(0,0,0,.14)"/>';
+    if (m === "party") h += confetti(12);
+    if (m === "cheer") h += confetti(7);
+    h += '<g class="fig">';
+    // Beine, Körper, Bauch
+    h += '<ellipse cx="72" cy="188" rx="19" ry="12" fill="' + B + '"/><ellipse cx="128" cy="188" rx="19" ry="12" fill="' + B + '"/>';
+    h += '<ellipse cx="100" cy="150" rx="50" ry="42" fill="' + B + '"/><ellipse cx="100" cy="158" rx="30" ry="26" fill="' + T + '"/>';
+    // Arme hinter dem Kopf
+    var armL = function (cx, cy, rot) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="13" ry="29" transform="rotate(' + rot + ' ' + cx + ' ' + cy + ')" fill="' + B + '"/>'; };
+    var handsFront = (m === "worried" || m === "cry");
+    if (m === "party" || m === "cheer") h += armL(46, 116, -28) + armL(154, 116, 28);
+    else if (m === "happy") h += armL(50, 156, 12) + armL(154, 116, 28);
+    else if (m === "meh") h += armL(50, 156, 12) + armL(150, 156, -12);
+    // Ohren, Kopf, Schnauze, Nase
+    h += '<circle cx="54" cy="50" r="19" fill="' + B + '"/><circle cx="54" cy="50" r="10" fill="' + T + '"/>';
+    h += '<circle cx="146" cy="50" r="19" fill="' + B + '"/><circle cx="146" cy="50" r="10" fill="' + T + '"/>';
+    h += '<ellipse cx="100" cy="88" rx="60" ry="54" fill="' + B + '"/>';
+    h += '<ellipse cx="100" cy="106" rx="28" ry="21" fill="' + T + '"/>';
+    h += '<ellipse cx="100" cy="97" rx="9.5" ry="6.5" fill="' + D + '"/><ellipse cx="97" cy="95" rx="3" ry="1.8" fill="#fff" opacity=".6"/>';
+    if (m === "party" || m === "cheer" || m === "happy") h += '<circle cx="58" cy="104" r="8" fill="' + PK + '" opacity=".55"/><circle cx="142" cy="104" r="8" fill="' + PK + '" opacity=".55"/>';
+    // Augen
+    var eye = function (cx, px, r, lid) {
+      var e = '<circle cx="' + cx + '" cy="80" r="11.5" fill="#fff"/><circle cx="' + (cx + px) + '" cy="82" r="' + r + '" fill="' + D + '"/><circle cx="' + (cx + px + 2.2) + '" cy="79" r="2.4" fill="#fff"/>';
+      if (lid) e += '<path d="M' + (cx - 11.5) + ' 80 A11.5 11.5 0 0 1 ' + (cx + 11.5) + ' 80 Z" fill="' + B + '"/><path d="M' + (cx - 11.5) + ' 80 H' + (cx + 11.5) + '" stroke="' + D + '" stroke-width="2.5"/>';
+      return e;
+    };
+    var sw = 'fill="none" stroke="' + D + '" stroke-width="4.5" stroke-linecap="round" stroke-linejoin="round"';
+    if (m === "party") h += '<path d="M66 84 Q76 66 86 84" ' + sw + '/><path d="M114 84 Q124 66 134 84" ' + sw + '/>';
+    else if (m === "cheer" || m === "happy") h += eye(76, 0, 6.5) + eye(124, 0, 6.5);
+    else if (m === "meh") h += eye(76, 1, 6, true) + eye(124, 1, 6, true);
+    else if (m === "worried") h += eye(76, 3, 4.2) + eye(124, 3, 4.2) + '<path d="M62 64 L88 56 M112 56 L138 64" ' + sw + '/>';
+    else h += '<path d="M66 72 L86 81 L66 90" ' + sw + '/><path d="M134 72 L114 81 L134 90" ' + sw + '/><path d="M60 62 L86 54 M114 54 L140 62" ' + sw + '/>';
+    // Mund
+    if (m === "party") h += '<path d="M78 108 Q100 150 122 108 Z" fill="' + D + '"/><ellipse cx="100" cy="122" rx="12" ry="6" fill="#E96A7E"/>';
+    else if (m === "cheer") h += '<path d="M84 108 Q100 138 116 108 Z" fill="' + D + '"/><ellipse cx="100" cy="117" rx="9" ry="5" fill="#E96A7E"/>';
+    else if (m === "happy") h += '<path d="M100 103 V110 M84 111 Q100 127 116 111" ' + sw + '/>';
+    else if (m === "meh") h += '<path d="M100 103 V110 M89 117 Q100 119 111 116" ' + sw + '/>';
+    else if (m === "worried") h += '<path d="M84 120 Q92 112 100 119 Q108 126 116 118" ' + sw + '/>';
+    else h += '<path d="M84 125 Q100 104 116 125 Z" fill="' + D + '"/>';
+    // Tränen
+    if (m === "cry") {
+      h += '<rect x="64" y="90" width="6" height="38" rx="3" fill="' + W + '" opacity=".55"/><rect x="130" y="90" width="6" height="38" rx="3" fill="' + W + '" opacity=".55"/>';
+      h += '<path class="tear" d="M67 92 q-5 9 0 13 q5 -4 0 -13z" fill="' + W + '"/><path class="tear" style="animation-delay:.5s" d="M133 92 q-5 9 0 13 q5 -4 0 -13z" fill="' + W + '"/>';
+    }
+    if (m === "worried") h += '<path class="drop" d="M150 36 q-7 11 0 15 q7 -4 0 -15z" fill="' + W + '"/>';
+    // Hände vor dem Gesicht
+    if (handsFront) h += armL(60, 138, -38) + armL(140, 138, 38);
+    // Partyhut
+    if (m === "party") h += '<g transform="rotate(-12 100 36)"><polygon points="100,-12 74,40 126,40" fill="#7C5CFF"/><path d="M88 14 L112 14 M82 26 L118 26" stroke="#FFD84D" stroke-width="5" stroke-linecap="round"/><circle cx="100" cy="-12" r="7" fill="#FFD84D"/></g>';
+    if (m === "cry") h += '<g fill="#8D98A8"><circle cx="78" cy="6" r="12"/><circle cx="100" cy="-1" r="15"/><circle cx="124" cy="6" r="12"/><rect x="78" y="4" width="46" height="14" rx="7"/></g>';
+    h += '</g>';
+    if (m === "party") h += star(20, 40, 1.2, 0) + star(182, 34, 1.5, .3) + star(176, 112, 1, .6) + star(24, 116, 1.1, .9);
+    if (m === "cheer") h += star(24, 52, 1.2, 0) + star(178, 46, 1.2, .4);
+    if (m === "happy") h += star(30, 60, 1, 0) + star(172, 70, 1, .5);
+    return h + '</svg>';
+  }
+
+  // ---- Statistik ----------------------------------------------------------------
+  var stClef = "treble", selRun = null, clearArmed = false;
+
+  var stAcc = "off";
+  function runsFor(c) { return state.history.filter(function (h) { return h.clef === c && (h.acc || "off") === stAcc; }); }
+  function fmtDate(t) { return new Date(t).toLocaleDateString("de-DE", { day: "numeric", month: "short" }); }
+  function niceMax(v) {
+    var steps = [2, 4, 6, 8, 10, 15, 20, 30, 45, 60, 90, 120, 180];
+    for (var i = 0; i < steps.length; i++) if (steps[i] >= v * 1.1) return steps[i];
+    return Math.ceil(v * 1.1);
+  }
+
+  function lineChart(svgEl, vals, o) {
+    clear(svgEl);
+    var L = 36, R = 16, T = 20, Y0 = 118, XR = 300 - R;
+    var yOfV = function (v) { return Y0 - (v - o.min) / (o.max - o.min) * (Y0 - T); };
+    var xOfI = function (i) { return vals.length === 1 ? (L + XR) / 2 : L + i * (XR - L) / (vals.length - 1); };
+    o.ticks.forEach(function (t) {
+      var y = yOfV(t);
+      svgEl.appendChild(el("line", { x1: L, x2: XR, y1: y, y2: y }, "gl"));
+      var tx = el("text", { x: L - 6, y: y + 3.5, "text-anchor": "end" }, "tick"); tx.textContent = o.fmt(t);
+      svgEl.appendChild(tx);
+    });
+    if (vals.length > 1) {
+      var d = vals.map(function (v, i) { return (i ? "L" : "M") + xOfI(i).toFixed(1) + " " + yOfV(v).toFixed(1); }).join(" ");
+      svgEl.appendChild(el("path", { d: d }, "line"));
+    }
+    vals.forEach(function (v, i) {
+      var sel = selRun === o.offset + i;
+      svgEl.appendChild(el("circle", { cx: xOfI(i), cy: yOfV(v), r: 4.5 }, "dot" + (sel ? " sel" : "")));
+    });
+    var li = vals.length - 1, lx = Math.max(24, Math.min(276, xOfI(li)));
+    var lab = el("text", { x: lx, y: yOfV(vals[li]) - 10 }, "endlab"); lab.textContent = o.fmt(vals[li]);
+    svgEl.appendChild(lab);
+    var a = el("text", { x: xOfI(0), y: 138, "text-anchor": vals.length > 1 ? "start" : "middle" }, "tick"); a.textContent = "Einheit " + (o.offset + 1);
+    svgEl.appendChild(a);
+    if (vals.length > 1) {
+      var b = el("text", { x: xOfI(li), y: 138, "text-anchor": "end" }, "tick"); b.textContent = "Einheit " + (o.offset + vals.length);
+      svgEl.appendChild(b);
+    }
+    vals.forEach(function (v, i) {
+      var c = el("circle", { cx: xOfI(i), cy: yOfV(v), r: 15, "data-i": o.offset + i }, "hit");
+      svgEl.appendChild(c);
+    });
+  }
+
+  function renderStats() {
+    setPressed($("stClefSeg"), "clef", stClef);
+    setPressed($("stAccSeg"), "acc", stAcc);
+    var list = runsFor(stClef), has = list.length > 0;
+    $("statsBody").hidden = !has;
+    $("stEmpty").hidden = has;
+    $("btnClearHist").hidden = state.history.length === 0;
+    $("btnClearHist").textContent = clearArmed ? "Wirklich alles löschen? Nochmal tippen" : "Verlauf löschen";
+    if (!has) return;
+    var quotas = list.map(function (h) { return h.right / h.total * 100; });
+    var paces = list.map(function (h) { return h.ms / 1000 / h.total; });
+    $("stN").textContent = list.length;
+    $("stBest").textContent = Math.round(Math.max.apply(null, quotas)) + " %";
+    $("stFast").textContent = fmtSec(Math.min.apply(null, paces));
+    if (list.length >= 2) {
+      var dq = Math.round(quotas[quotas.length - 1] - quotas[0]), dp = paces[0] - paces[paces.length - 1];
+      $("stTrend").textContent = "Seit der ersten Einheit: Trefferquote " + (dq >= 0 ? "+" : "−") + Math.abs(dq) + " Prozentpunkte, " +
+        fmtSec(Math.abs(dp)) + (dp >= 0 ? " schneller" : " langsamer") + " pro Note.";
+    } else {
+      $("stTrend").textContent = "Das ist deine erste Einheit. Ab der zweiten siehst du, wie du dich entwickelst.";
+    }
+    var n = Math.min(30, list.length), off = list.length - n;
+    lineChart($("chartQuota"), quotas.slice(off), { min: 0, max: 100, ticks: [0, 50, 100], fmt: function (v) { return Math.round(v) + " %"; }, offset: off });
+    var pm = niceMax(Math.max.apply(null, paces.slice(off)));
+    lineChart($("chartTime"), paces.slice(off), { min: 0, max: pm, ticks: [0, pm / 2, pm], fmt: function (v) { return (Math.round(v * 10) / 10).toString().replace(".", ",") + " s"; }, offset: off });
+    var rows = $("stRows"); rows.innerHTML = "";
+    list.slice(-10).reverse().forEach(function (h) {
+      var tr = document.createElement("tr");
+      tr.innerHTML = "<td>" + fmtDate(h.d) + "</td><td>" + h.total + "</td><td class=\"r\">" + h.right + "</td><td class=\"r\">" + fmtTime(h.ms) + "</td>";
+      rows.appendChild(tr);
+    });
+    var info = $("stInfo");
+    if (selRun !== null && list[selRun]) {
+      var r = list[selRun];
+      info.textContent = "Einheit " + (selRun + 1) + " am " + fmtDate(r.d) + ": " + r.right + " von " + r.total + " richtig (" + Math.round(r.right / r.total * 100) + " %), " +
+        fmtTime(r.ms) + " gesamt, " + fmtSec(r.ms / 1000 / r.total) + " pro Note.";
+    } else {
+      info.textContent = "Tippe auf einen Punkt für Details.";
+    }
+  }
+
+  function chartTap(e) {
+    var t = e.target.closest("[data-i]");
+    if (!t) return;
+    selRun = +t.getAttribute("data-i");
+    renderStats();
+  }
+  $("chartQuota").addEventListener("click", chartTap);
+  $("chartTime").addEventListener("click", chartTap);
+  $("stClefSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    stClef = b.dataset.clef; selRun = null; renderStats();
+  });
+  $("stAccSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    stAcc = b.dataset.acc; selRun = null; renderStats();
+  });
+  $("btnStats").addEventListener("click", function () {
+    stClef = state.clef; stAcc = state.acc; selRun = null; clearArmed = false; renderStats(); show("viewStats");
+  });
+  $("btnStatsBack").addEventListener("click", function () { clearArmed = false; renderStart(); show("viewStart"); });
+  $("btnClearHist").addEventListener("click", function () {
+    if (!clearArmed) { clearArmed = true; renderStats(); return; }
+    state.history = []; clearArmed = false; selRun = null; save(); renderStats(); renderStart();
+  });
+
+  $("btnAgain").addEventListener("click", startSession);
+  $("btnHome").addEventListener("click", function () { renderStart(); show("viewStart"); });
+  $("btnStart").addEventListener("click", startSession);
+
+  // ---- Einstellungen: Tonumfang per Grafik ----------------------------------------
+  var which = 0;                 // 0 = tiefste, 1 = höchste Note wird gesetzt
+  var rangeSvg = $("rangeSvg");
+  var LOW_X = 140, HIGH_X = 220;
+
+  function drawRange() {
+    var c = state.edClef, r = state.range[c];
+    drawStaffBase(rangeSvg, c);
+    var top = yOf(r[1] - BASE[c]) - 8, bot = yOf(r[0] - BASE[c]) + 8;
+    var band = el("rect", { x: 96, y: top, width: 190, height: bot - top, rx: 8 }, "band");
+    rangeSvg.insertBefore(band, rangeSvg.firstChild);
+    rangeSvg.appendChild(noteGroup(LOW_X, r[0] - BASE[c]));
+    rangeSvg.appendChild(noteGroup(HIGH_X, r[1] - BASE[c]));
+    var act = which === 0 ? LOW_X : HIGH_X, ay = yOf(r[which] - BASE[c]);
+    rangeSvg.appendChild(el("ellipse", { cx: act, cy: ay, rx: 15, ry: 12 }, "ring"));
+    var t1 = el("text", { x: LOW_X, y: 204 }, "cap" + (which === 0 ? " on" : "")); t1.textContent = "TIEFSTE";
+    var t2 = el("text", { x: HIGH_X, y: 204 }, "cap" + (which === 1 ? " on" : "")); t2.textContent = "HÖCHSTE";
+    rangeSvg.appendChild(t1); rangeSvg.appendChild(t2);
+    $("whichLow").textContent = "Tiefste: " + label(r[0]);
+    $("whichHigh").textContent = "Höchste: " + label(r[1]);
+    setPressed($("edClefSeg"), "clef", c);
+    setPressed($("edWhichSeg"), "which", which);
+    $("selLow").value = r[0]; $("selHigh").value = r[1];
+  }
+
+  function fillSelects() {
+    var c = state.edClef;
+    [$("selLow"), $("selHigh")].forEach(function (s) {
+      s.innerHTML = "";
+      for (var n = LIMITS[c][0]; n <= LIMITS[c][1]; n++) {
+        var o = document.createElement("option");
+        o.value = n; o.textContent = label(n);
+        s.appendChild(o);
+      }
+    });
+  }
+
+  function setBound(i, n) {
+    var c = state.edClef, r = state.range[c].slice();
+    n = Math.max(LIMITS[c][0], Math.min(LIMITS[c][1], n));
+    r[i] = n;
+    if (r[0] > r[1]) { if (i === 0) r[1] = r[0]; else r[0] = r[1]; }
+    state.range[c] = r; save(); drawRange();
+  }
+
+  rangeSvg.addEventListener("click", function (e) {
+    var rect = rangeSvg.getBoundingClientRect();
+    var y = VB_Y + (e.clientY - rect.top) * (VB_H / rect.height);
+    var p = Math.round((BOTTOM - y) / (S / 2));
+    setBound(which, BASE[state.edClef] + p);
+    if (which === 0) which = 1;   // nach der tiefsten Note kommt die höchste
+    drawRange();
+  });
+
+  $("edWhichSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    which = +b.dataset.which; drawRange();
+  });
+  $("edClefSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.edClef = b.dataset.clef; which = 0; fillSelects(); drawRange();
+  });
+  $("selLow").addEventListener("change", function () { setBound(0, +$("selLow").value); });
+  $("selHigh").addEventListener("change", function () { setBound(1, +$("selHigh").value); });
+  $("presets").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.range[state.edClef] = PRESETS[state.edClef][b.dataset.preset].slice();
+    save(); drawRange();
+  });
+
+  $("nameSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.names = b.dataset.names; save();
+    setPressed($("nameSeg"), "names", state.names);
+    fillSelects(); drawRange();
+  });
+
+  $("accSeg").addEventListener("click", function (e) {
+    var b = e.target.closest("button"); if (!b) return;
+    state.acc = b.dataset.acc; save(); setPressed($("accSeg"), "acc", state.acc);
+  });
+
+  $("btnSettings").addEventListener("click", openSettings);
+  $("btnEditRange").addEventListener("click", openSettings);
+  function openSettings() {
+    state.edClef = state.clef; which = 0;
+    setPressed($("nameSeg"), "names", state.names);
+    setPressed($("accSeg"), "acc", state.acc);
+    fillSelects(); drawRange(); show("viewSettings");
+  }
+  $("btnBack").addEventListener("click", function () {
+    state.clef = state.edClef; save(); renderStart(); show("viewStart");
+  });
+
+  // ---- Start -------------------------------------------------------------------
+  renderStart();
+})();
+</script>
+
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", function () { navigator.serviceWorker.register("sw.js").catch(function () {}); });
+}
+</script>
+</body>
+</html>
